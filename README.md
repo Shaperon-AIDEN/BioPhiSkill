@@ -1,332 +1,171 @@
+# BioPhiSkill
+
 <p align="center">
-    <br>
-    <img height="90" src="biophi/common/web/static/img/logo-light/2x/biophi_logo@2x.png?raw=true?raw=true">
-    <br>
-    <br>
-    <a href="https://github.com/Merck/BioPhi/actions/workflows/python-package-conda.yml">
-    <img src="https://github.com/Merck/BioPhi/actions/workflows/python-package-conda.yml/badge.svg"
-        alt="Build & Test"></a>
-    <a href="https://anaconda.org/bioconda/biophi">
-        <img src="https://img.shields.io/conda/dn/bioconda/biophi.svg?style=flag&label=BioConda%20install&color=green"
-            alt="BioConda Install"></a>
-    <a href="https://github.com/Merck/BioPhi/releases">
-        <img src="https://img.shields.io/github/v/release/Merck/BioPhi?include_prereleases"
-            alt="Latest GitHub release"></a>
-    <a href="https://twitter.com/intent/follow?screen_name=BioPhi">
-        <img src="https://img.shields.io/twitter/follow/BioPhi?style=social&logo=twitter"
-            alt="follow on Twitter"></a>    
+  <strong>Antibody Humanization & Humanness Evaluation — Agent Skill</strong><br>
+  Powered by <a href="https://github.com/Merck/Sapiens">Sapiens</a> deep learning and the <a href="https://github.com/Merck/BioPhi">OASis</a> dataset via Azure REST API
 </p>
 
-BioPhi is an open-source antibody design platform. 
-It features methods for automated antibody humanization (Sapiens), humanness evaluation (OASis) and an interface for computer-assisted antibody sequence design.
+> **BioPhiSkill** is a lightweight, agent-friendly fork of [BioPhi](https://github.com/Merck/BioPhi) (Merck). Web server, Redis, and Celery dependencies have been removed. The 22 GB local OASis database is replaced by a hosted Azure API.
 
-Learn more in the BioPhi, Sapiens and OASis in our publication:
+---
 
-> David Prihoda, Jad Maamary, Andrew Waight, Veronica Juan, Laurence Fayadat-Dilman, Daniel Svozil & Danny A. Bitton (2022) 
-> BioPhi: A platform for antibody design, humanization, and humanness evaluation based on natural antibody repertoires and deep learning, mAbs, 14:1, DOI: https://doi.org/10.1080/19420862.2021.2020203
+## Installation
 
-The university-hosted BioPhi web server is available at: [http://biophi.dichlab.org](http://biophi.dichlab.org)
+```bash
+# 1. Clone
+git clone https://github.com/Shaperon-AIDEN/BioPhiSkill.git
+cd BioPhiSkill
 
-For more information about the Sapiens antibody language model, see the [Sapiens repository](https://github.com/Merck/Sapiens)
+# 2. Install (creates conda env 'biophi' with all dependencies)
+bash install.sh
 
-The data and notebooks supporting the analysis are found in the [BioPhi-2021-publication repository](https://github.com/Merck/BioPhi-2021-publication)
+# 3. Activate
+conda activate biophi
+```
 
-## BioPhiSkill (Agent Lightweight Edition)
+### Requirements
+- [Conda](https://docs.conda.io/en/latest/miniconda.html) (Miniconda recommended)
+- Internet access (Sapiens model downloaded from HuggingFace on first run; OASis API calls)
 
-This repository (`BioPhiSkill`) is a modernized, lightweight version of BioPhi. The original Flask server, Redis, and Celery dependencies have been removed, making it extremely fast to operate directly from a Python script or AI Agent. 
-Instead of a 22GB local SQLite database, OASis humanness evaluation utilizes a lightweight Azure REST API. It also includes built-in `matplotlib`/`seaborn` visualization functions.
+---
 
-### Usage via `agent_api.py`
-
-You can evaluate the humanness of a sequence and generate performance plots automatically:
+## Quick Start
 
 ```python
-from agent_api import evaluate_and_plot_humanness
+from agent_api import humanize_antibody_sequence
 
-vh_seq = "EVQLVESGGGLVQPGRSLRLSCAASGFTFDDYAMHWVRQAPGKGLEWVSAITWNSGHIDYADSVEGRFTISRDNAKNSLYLQMNSLRAEDTAVYYCAKVSYLSTASSLDYWGQGTLVTVSS"
-result = evaluate_and_plot_humanness(vh_seq=vh_seq, output_dir="./bio_output")
+vh = "EVQLQQSGAELVRPGALVKLSCKASGFNIKDYYMHWVKQRPEQGLEWIGWIDPENGDTEYAPKFQGKATMTADTSSNTAYLQLSSLTSEDTAVYYCNADDHYWGQGTTLTVSS"
 
-print(f"OASis Identity: {result['oasis_identity']}%")
-print(f"Plot saved to: {result['plot_image']}")
+result = humanize_antibody_sequence(
+    vh_seq=vh,
+    vl_seq=None,         # optional light chain
+    output_dir="./output"
+)
+print(result["summary"])
 ```
 
-## Intro video
+---
 
-<a href="http://www.youtube.com/watch?v=JNfU4cR1hgI" target="_blank" title="BioPhi Intro Video">
-    <img src="https://biophi.dichlab.org/static/img/preview.png" alt="BioPhi Intro Video" height="350">
-</a>
+## API Reference
 
-## Contributing
+### `humanize_antibody_sequence(...)` — Full Pipeline
 
-BioPhi is an open and extensible platform, contributions are welcome. 
+Runs **Sapiens humanization** then evaluates humanness **before and after** via OASis.
 
-If you have ideas about what to improve or which tools could be integrated, please submit
-any feature requests using the [Issues](https://github.com/Merck/biophi/issues) tab.
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `vh_seq` | required | Heavy chain amino acid sequence |
+| `vl_seq` | `None` | Light chain amino acid sequence (optional) |
+| `scheme` | `"imgt"` | Numbering scheme: `imgt` / `kabat` / `chothia` |
+| `cdr_definition` | `"imgt"` | CDR definition: `imgt` / `kabat` / `chothia` |
+| `sapiens_iterations` | `1` | Sapiens model iteration count |
+| `humanize_cdrs` | `False` | If `True`, CDR regions are also humanized |
+| `min_fraction_subjects` | `0.1` | OASis threshold — peptides found in ≥10% of human subjects are "human" |
+| `output_dir` | `"output"` | Directory for output files |
 
-## Running BioPhi on your machine
+**Returns** `dict`:
 
-If you don't want to use the [public BioPhi server](http://biophi.dichlab.org), you can run BioPhi on your own machine.
+| Key | Type | Description |
+|-----|------|-------------|
+| `summary` | `str` | Human-readable text summary (print-ready) |
+| `vh_mutations` | `list` | `[{"position": "H1", "from": "E", "to": "Q"}, ...]` |
+| `vl_mutations` | `list` | Same for light chain |
+| `before` | `dict` | Metrics before humanization (see below) |
+| `after` | `dict` | Metrics after humanization |
+| `germlines` | `dict` | `{vh_before, vh_after, vl_before, vl_after}` germline gene names |
+| `plot_image` | `str` | Absolute path to `humanness_plot.png` |
+| `excel_report` | `str` | Absolute path to `humanization_report.xlsx` |
 
-### 1. Download OASis database
+**`before` / `after` dict keys**:
 
-To run BioPhi with OASis humanness evaluation locally, 
-you will need to download and unzip the
-[OASis database file (22GB uncompressed)](https://zenodo.org/record/5164685).
+| Key | Description |
+|-----|-------------|
+| `oasis_identity` | Combined VH+VL OASis identity (%) |
+| `oasis_identity_vh` | VH-only OASis identity (%) |
+| `oasis_identity_vl` | VL-only OASis identity (%) |
+| `oasis_percentile` | VH percentile rank vs human antibody database (0–1) |
+| `germline_content` | % of residues matching closest human germline (VH) |
 
-```bash
-# Download database file
-wget https://zenodo.org/record/5164685/files/OASis_9mers_v1.db.gz
-# Unzip
-gunzip OASis_9mers_v1.db.gz
+---
+
+### `evaluate_humanness(...)` — Evaluation Only
+
+Evaluate humanness **without** running Sapiens (e.g. for a sequence already engineered).
+
+```python
+from agent_api import evaluate_humanness
+
+result = evaluate_humanness(
+    vh_seq="EVQLVESGGGLVQPGR...",
+    output_dir="./output"
+)
+print(result["summary"])
 ```
 
-> [!NOTE]
-> If you are only interested in computing OASis identity using antibody peptides found in >10% of human subjects, you can use our new pip-installable library `promb`: https://github.com/MSDLLCpapers/promb
+Returns the same metrics keys as `before`/`after` above, plus `plot_image`, `excel_report`, `summary`.
 
-### 2. Install BioPhi using Conda
+---
 
-You can install BioPhi using [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/download.html) 
-or one of the alternatives ([Miniconda](https://docs.conda.io/en/latest/miniconda.html), 
-[Miniforge](https://github.com/conda-forge/miniforge)).
+## Understanding the Results
 
-Install BioPhi using:
+### OASis Identity
+The **fraction of 9-mer peptides** in the antibody V-region that appear in ≥10% of human subjects in the OAS database.
 
-```bash
-# Recommended: Create a separate BioPhi environment
-conda create -n biophi python=3.9
-conda activate biophi
+- **< 30%** — Highly non-human (typical murine antibody)
+- **30–60%** — Partially human
+- **> 80%** — Highly human (clinical candidates typical range)
 
-# Install BioPhi 
-# Using Bioconda and Conda-Forge channels
-conda install biophi -c bioconda -c conda-forge --override-channels
+### OASis Percentile
+Rank of the antibody's OASis identity compared to a reference set of clinical-stage human antibodies. A value of **0.5** means the antibody is more human than 50% of clinical antibodies.
+
+### Germline Content
+Percentage of residues in the V-region that match the closest human germline gene. After Sapiens humanization this typically increases.
+
+### Humanizing Mutations
+Positions where Sapiens changed an amino acid to increase humanness. Format: `{from}{IMGT_position}{to}` (e.g. `EH1Q` = position H1, E→Q).
+
+---
+
+## Output Files
+
+### `humanness_plot.png`
+Bar chart of per-peptide OASis subject frequency across the V-region:
+- **Green bars** — peptide found in ≥10% of human subjects (human)
+- **Red bars** — peptide found in <10% of human subjects (non-human)
+- **Orange dashed line** — threshold (default 10%)
+
+Two column view: left = before humanization, right = after.
+
+### `humanization_report.xlsx`
+| Sheet | Contents |
+|-------|----------|
+| **Summary** | OASis identity, percentile, germline content, germline genes (before & after) |
+| **Mutations** | All position-level mutations introduced by Sapiens |
+| **VH Before / VH After** | Per-peptide humanness detail for heavy chain |
+| **VL Before / VL After** | Per-peptide humanness detail for light chain |
+
+---
+
+## Architecture
+
+```
+BioPhiSkill/
+├── SKILL.md              ← Skill descriptor for Claude Code / OpenCode
+├── install.sh            ← One-shot installer
+├── agent_api.py          ← Main API (humanize_antibody_sequence, evaluate_humanness)
+├── patches/
+│   └── anarci_compat.py  ← Auto-applied ANARCI compatibility patch (Python 3.12+)
+└── biophi/               ← Core library (Sapiens + OASis logic)
+    └── humanization/
+        └── methods/
+            ├── humanization.py  ← Sapiens & CDR grafting
+            └── humanness.py     ← OASis (Azure REST API)
 ```
 
-If conda installation fails, you can try running using Docker. See [Run BioPhi using provided Docker image](https://github.com/Merck/BioPhi#run-biophi-using-provided-docker-image).
+---
 
-### 3. Run simplified server
+## Citation
 
-```bash
-# Set up path to OASis database (downloaded and unzipped)
-export OASIS_DB_PATH=/path/to/downloaded/OASis_9mers_v1.db
+If you use BioPhiSkill, please cite the original BioPhi paper:
 
-# Run simplified BioPhi server (not for live deployment!)
-biophi web
-```
-
-**Note:** This is simplified usage for local use only. 
-See [Deploying your own BioPhi server](#deploying-your-own-biophi-server) section below 
-to learn about deploying BioPhi properly on a server.
-
-## Run BioPhi using provided Docker image
-
-First, download OASis DB as described above.
-
-Then, run a simplified BioPhi server using the provided Docker image:
-
-```bash
-docker run \
-    -v /your/absolute/path/to/oasis/directory/:/data \
-    -e OASIS_DB_PATH=/data/OASis_9mers_v1.db \
-    -p 5000:5000 \
-    quay.io/biocontainers/biophi:1.0.5--pyhdfd78af_0 \
-    biophi web --host 0.0.0.0
-```
-
-The application will be accessible at [localhost:5000](http://localhost:5000).
-
-**Note:** This is simplified usage for local use only. 
-See [Deploying your own BioPhi server](#deploying-your-own-biophi-server) section below 
-to learn about deploying BioPhi properly on a server.
-
-## BioPhi command-line interface
-
-BioPhi also provides a command-line interface that enables bulk processing.
-
-<details>
-    <summary>See more</summary>
-
-```bash
-# Get humanized FASTA
-# Expected input: Both chains of each antibody should have the same ID
-#                 with an optional _VL/_VH or _HC/_LC suffix
-biophi sapiens mabs.fa --fasta-only --output humanized.fa
-
-# Run full humanization & humanness evaluation pipeline
-biophi sapiens mabs.fa \
-    --oasis-db path/to/downloaded/OASis_9mers_v1.db \
-    --output humanized/
-
-# Get the Sapiens probability matrix (score of each residue at each position)
-biophi sapiens mabs.fa --scores-only --output scores.csv
-
-# Get mean Sapiens score (one score for each sequence)
-biophi sapiens mabs.fa --mean-score-only --output scores.csv
-
-# Get OASis humanness evaluation
-biophi oasis mabs.fa \
-    --oasis-db path/to/downloaded/OASis_9mers_v1.db \
-    --output oasis.xlsx
-```
-  
-</details>
-
-## Development
-
-BioPhi is composed of three services that need to be running at the same time:
-
-- `web`: Flask web server that handles both the frontend and the backend of the web application
-- `celery`: Asynchronous worker service(s) that process long-running tasks
-- `redis`: In-memory database for storing celery queue tasks and results
-
-### Run BioPhi dev server through Docker Compose
-
-Running through Docker Compose is easiest in terms of setup, but web server autoreload is not supported,
-so you will have to restart the services after each code update.
-
-<details>
-    <summary>See more</summary>
-
-#### 1. Install Docker
-
-See https://docs.docker.com/get-docker/
-
-#### 2. Clone this repository
-    
-Download or clone this repository using:
-    
-```bash
-git clone https://github.com/Merck/BioPhi.git
-```   
-
-#### 3. Download OASis DB
-
-Download OASis database as described above. Put it in local `data/` dir inside the project folder.
-    
-#### 4. Build all images using Docker Compose    
-    
-```bash
-# Open BioPhi directory
-cd BioPhi    
-# Build docker image using Makefile
-make docker-build
-# or directly using
-docker-compose build
-```
-
-#### 4. Run all services using Docker Compose
-
-```bash
-# Run using Makefile
-make docker-run
-# or directly using
-docker-compose up
-```
-
-The application will be accessible at [localhost:5000](http://localhost:5000).
-
-To build and run, you can use:
-```bash
-# Run using Makefile
-make docker-build docker-run
-# or directly using
-docker-compose up --build
-```
-
-#### 5. Handle code updates
-
-After your code is updated, you will need to stop the services, run build and start again. 
-See the next section for info on running locally with flask auto-reload.
-
-</details>
-
-
-### Run BioPhi dev server using Conda
-
-Running each service locally using Conda will enable flask auto-reload, 
-which is useful if you are going back and forth between your IDE and the browser.
-
-<details>
-    <summary>See more</summary>
-
-#### 1. Install Conda
-
-Install [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/download.html) 
-or one of the alternatives ([Miniconda](https://docs.conda.io/en/latest/miniconda.html), 
-[Miniforge](https://github.com/conda-forge/miniforge))
-
-#### 2. Install Redis server
-
-Install and run [Redis server](https://redis.io/download). 
-On Mac, you can [install Redis using Brew](https://medium.com/@petehouston/install-and-config-redis-on-mac-os-x-via-homebrew-eb8df9a4f298).
-    
-#### 3. Clone this repository
-    
-Download or clone this repository using:
-    
-```bash
-git clone https://github.com/Merck/BioPhi.git
-```   
-
-#### 4. Download OASis DB
-
-Download OASis database as described above.
- 
-#### 5. Setup environment
-
-```bash
-# Open BioPhi directory
-cd BioPhi    
-# Install dependencies using the provided Makefile
-make env
-# Or directly using
-conda env create -n biophi -f environment.yml
-conda activate biophi
-pip install -e . --no-deps
-```
-
-#### 6. Run all services
-
-You will have to run each service in a separate terminal (Use Cmd+T to open a new tab):
-
-```bash
-# Run Redis server (this depends on your installation, the server might already be running)
-redis-server
-
-# In a separate terminal, run celery worker queue
-export OASIS_DB_PATH=/path/to/OASis_9mers_v1.db
-make celery
-
-# In a separate terminal, run flask web server
-export OASIS_DB_PATH=/path/to/OASis_9mers_v1.db
-make web
-```
-
-See the provided 
-
-#### 7. Handle code updates
-
-After your code is updated, the flask web service should refresh automatically. 
-However, the celery service needs to be stopped and started manually, 
-so you will need to do that if you update code that is executed from the workers.
-</details>
-
-## Deploying your own BioPhi server
-
-You can deploy your own internal BioPhi server. 
-You will need to run the three separate services - the flask web server, 
-the celery worker and the redis database.
-
-This will depend on your platform and your cloud provider, the easiest deployment is using [Docker Compose](https://docs.docker.com/compose/gettingstarted/)
-through the provided [docker-compose.yml](docker-compose.yml) file.
-
-For 🐧 Ubuntu deployment, feel free to copy the deployment configs used on the public university server: [lich-uct/biophi.dichlab.org](https://github.com/lich-uct/biophi.dichlab.org)
-
-## Acknowledgements
-
-BioPhi is based on antibody repertoires from the Observed Antibody Space:
-
-> Kovaltsuk, A., Leem, J., Kelm, S., Snowden, J., Deane, C. M., & Krawczyk, K. (2018). Observed Antibody Space: A Resource for Data Mining Next-Generation Sequencing of Antibody Repertoires. The Journal of Immunology, 201(8), 2502–2509. https://doi.org/10.4049/jimmunol.1800708
-
-Antibody numbering is performed using ANARCI:
-
-> Dunbar, J., & Deane, C. M. (2016). ANARCI: Antigen receptor numbering and receptor classification. Bioinformatics, 32(2), 298–300. https://doi.org/10.1093/bioinformatics/btv552
+> Prihoda et al. (2022) **BioPhi: A platform for antibody design, humanization, and humanness evaluation based on natural antibody repertoires and deep learning**, *mAbs*, 14:1. https://doi.org/10.1080/19420862.2021.2020203
