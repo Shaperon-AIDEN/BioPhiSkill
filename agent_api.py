@@ -32,6 +32,7 @@ try:
     if _skill_dir not in sys.path:
         sys.path.insert(0, _skill_dir)
     from patches import anarci_compat  # noqa: F401
+    from patches import sapiens_compat  # noqa: F401
 except Exception:
     pass  # If patch fails, proceed anyway — may work on Python <=3.11
 
