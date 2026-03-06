@@ -9,24 +9,34 @@ Functions
 - humanize_antibody_sequence: Full Sapiens humanization + before/after OASis evaluation + visualization
 - evaluate_humanness: OASis-only evaluation (no humanization)
 
-Usage
------
+Usage (after installing from GitHub)
+-------------------------------------
+    git clone https://github.com/Shaperon-AIDEN/BioPhiSkill.git
+    cd BioPhiSkill && bash install.sh
+    conda activate biophi
+
     from agent_api import humanize_antibody_sequence
-    result = humanize_antibody_sequence(
-        vh_seq="EVQLQQSGAELVRPGAL...",
-        vl_seq="DIQMTQSPSSLSASVGDRVTITC...",  # optional
-        output_dir="./output"
-    )
+    result = humanize_antibody_sequence(vh_seq="EVQLQQSGAELVRPGAL...", output_dir="./output")
     print(result["summary"])
 """
 
 import os
+import sys
 import warnings
 warnings.filterwarnings("ignore")
 
+# Auto-apply ANARCI compatibility patch for Python 3.12+
+# This must happen BEFORE any abnumber/anarci imports
+try:
+    _skill_dir = os.path.dirname(os.path.abspath(__file__))
+    if _skill_dir not in sys.path:
+        sys.path.insert(0, _skill_dir)
+    from patches import anarci_compat  # noqa: F401
+except Exception:
+    pass  # If patch fails, proceed anyway — may work on Python <=3.11
+
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import seaborn as sns
 from abnumber import Chain
 from biophi.humanization.methods.humanization import (
@@ -84,14 +94,14 @@ def humanize_antibody_sequence(
     Returns
     -------
     dict with keys:
-        - summary (str): Human-readable summary of results
-        - vh_mutations (list): List of (position, from_aa, to_aa) for VH
-        - vl_mutations (list): List of (position, from_aa, to_aa) for VL
-        - before (dict): OASis identity, percentile, germline content (VH/VL)
-        - after (dict): OASis identity, percentile, germline content (VH/VL)
-        - germlines (dict): VH/VL germline gene names (before, after)
-        - plot_image (str): Path to saved PNG plot
-        - excel_report (str): Path to saved Excel report
+        - summary (str)       : Human-readable summary of results
+        - vh_mutations (list) : [{position, from, to}, ...] for VH
+        - vl_mutations (list) : [{position, from, to}, ...] for VL
+        - before (dict)       : OASis identity, percentile, germline content (before)
+        - after  (dict)       : OASis identity, percentile, germline content (after)
+        - germlines (dict)    : VH/VL germline gene names before and after
+        - plot_image (str)    : Path to saved PNG plot
+        - excel_report (str)  : Path to saved Excel report
     """
     os.makedirs(output_dir, exist_ok=True)
 
@@ -127,10 +137,10 @@ def humanize_antibody_sequence(
     vh_mutations = _extract_mutations(vh_humanization) if vh_humanization else []
     vl_mutations = _extract_mutations(vl_humanization) if vl_humanization else []
 
-    # ---- OASis metrics ----  
+    # ---- OASis metrics ----
     t = min_fraction_subjects
     before = _metrics(before_vh, before_vl, t)
-    after  = _metrics(after_vh, after_vl, t)
+    after  = _metrics(after_vh,  after_vl,  t)
 
     # ---- Germlines ----
     germlines = {
@@ -148,10 +158,7 @@ def humanize_antibody_sequence(
         output_dir
     )
 
-    # ---- Summary text ----
-    summary = _build_summary(
-        vh_mutations, vl_mutations, before, after, germlines, t, plot_path
-    )
+    summary = _build_summary(vh_mutations, vl_mutations, before, after, germlines, t, plot_path)
     print(summary)
 
     return {
@@ -200,10 +207,12 @@ def evaluate_humanness(
     plot_path  = _save_plots(humanness_vh, None, humanness_vl, None, t, output_dir, compare=False)
     excel_path = _save_excel(None, None, humanness_vh, None, humanness_vl, None, output_dir)
 
-    summary_lines = ["=== OASis Humanness Evaluation ==="]
-    summary_lines.append(f"OASis Identity ({int(t*100)}%): {metrics['oasis_identity']:.1f}%")
-    summary_lines.append(f"OASis Percentile: {metrics['oasis_percentile']:.2f}")
-    summary_lines.append(f"Germline Content: {metrics['germline_content']:.1f}%")
+    summary_lines = [
+        "=== OASis Humanness Evaluation ===",
+        f"OASis Identity ({int(t*100)}%): {metrics['oasis_identity']:.1f}%",
+        f"OASis Percentile: {metrics['oasis_percentile']:.2f}",
+        f"Germline Content: {metrics['germline_content']:.1f}%",
+    ]
     if humanness_vh:
         summary_lines.append(f"VH Germline: {_germline(humanness_vh)}")
     if humanness_vl:
@@ -212,8 +221,13 @@ def evaluate_humanness(
     summary = "\n".join(summary_lines)
     print(summary)
 
-    return {**metrics, "germlines": {"vh": _germline(humanness_vh), "vl": _germline(humanness_vl)},
-            "summary": summary, "plot_image": plot_path, "excel_report": excel_path}
+    return {
+        **metrics,
+        "germlines": {"vh": _germline(humanness_vh), "vl": _germline(humanness_vl)},
+        "summary": summary,
+        "plot_image": plot_path,
+        "excel_report": excel_path,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -221,14 +235,12 @@ def evaluate_humanness(
 # ---------------------------------------------------------------------------
 
 def _extract_mutations(chain_humanization):
-    mutations = []
     if chain_humanization is None:
-        return mutations
+        return []
+    mutations = []
     aln = chain_humanization.alignment
     for pos in aln.positions:
-        pair = aln[pos]
-        # pair is a tuple (from_aa, to_aa) where '-' means gap
-        from_aa, to_aa = pair
+        from_aa, to_aa = aln[pos]
         if from_aa not in (None, '-', '') and to_aa not in (None, '-', '') and from_aa != to_aa:
             mutations.append({"position": str(pos), "from": from_aa, "to": to_aa})
     return mutations
@@ -242,7 +254,6 @@ def _metrics(vh_h, vl_h, t):
     def gc(h):
         return h.num_germline_residues / len(h.chain) * 100 if h else None
 
-    # Combined
     num_human = sum(h.get_num_human_peptides(t) for h in [vh_h, vl_h] if h)
     num_total = sum(h.get_num_peptides() for h in [vh_h, vl_h] if h)
     combined_id = (num_human / num_total * 100) if num_total else None
@@ -251,7 +262,7 @@ def _metrics(vh_h, vl_h, t):
         "oasis_identity": combined_id,
         "oasis_identity_vh": oasis_id(vh_h),
         "oasis_identity_vl": oasis_id(vl_h),
-        "oasis_percentile": oasis_pct(vh_h),  # use VH percentile as primary
+        "oasis_percentile": oasis_pct(vh_h),
         "germline_content": gc(vh_h),
         "germline_content_vl": gc(vl_h),
     }
@@ -300,7 +311,6 @@ def _save_plots(before_vh, after_vh, before_vl, after_vl, t, output_dir, compare
             ax.set_ylim(0, 105)
             ax.legend(fontsize=8)
 
-            # Tick labels sparsely
             pos_keys = list(humanness.peptides.keys())
             tick_every = max(1, len(pos_keys) // 15)
             ax.set_xticks(positions[::tick_every])
@@ -315,8 +325,6 @@ def _save_plots(before_vh, after_vh, before_vl, after_vl, t, output_dir, compare
 
 def _save_excel(vh_hzn, vl_hzn, before_vh, after_vh, before_vl, after_vl, output_dir):
     writer = pd.ExcelWriter(os.path.join(output_dir, "humanization_report.xlsx"), engine="openpyxl")
-
-    # Summary sheet
     rows = []
     for chain_label, before_h, after_h in [("VH", before_vh, after_vh), ("VL", before_vl, after_vl)]:
         if before_h:
@@ -336,7 +344,6 @@ def _save_excel(vh_hzn, vl_hzn, before_vh, after_vh, before_vl, after_vl, output
             })
     pd.DataFrame(rows).to_excel(writer, sheet_name="Summary", index=False)
 
-    # Mutations sheet
     mut_rows = []
     for chain_label, hzn in [("VH", vh_hzn), ("VL", vl_hzn)]:
         if hzn:
@@ -345,13 +352,11 @@ def _save_excel(vh_hzn, vl_hzn, before_vh, after_vh, before_vl, after_vl, output
     if mut_rows:
         pd.DataFrame(mut_rows).to_excel(writer, sheet_name="Mutations", index=False)
 
-    # Peptide detail sheets
     for chain_label, humanness in [("VH Before", before_vh), ("VH After", after_vh),
                                     ("VL Before", before_vl), ("VL After", after_vl)]:
         if humanness:
             try:
-                df = humanness.to_peptide_dataframe()
-                df.to_excel(writer, sheet_name=chain_label[:31], index=False)
+                humanness.to_peptide_dataframe().to_excel(writer, sheet_name=chain_label[:31], index=False)
             except Exception:
                 pass
 
@@ -368,13 +373,15 @@ def _build_summary(vh_mutations, vl_mutations, before, after, germlines, t, plot
         "  BioPhiSkill – Humanization Summary",
         "=" * 48,
         "",
-        f"[Humanizing Mutations]",
+        "[Humanizing Mutations]",
         f"  VH: {len(vh_mutations)} mutations",
-        f"  VL: {len(vl_mutations)} mutations" if vl_mutations else "",
     ]
+    if vl_mutations:
+        lines.append(f"  VL: {len(vl_mutations)} mutations")
     if vh_mutations:
-        lines.append("  VH changes: " + ", ".join(f"{m['from']}{m['position']}{m['to']}" for m in vh_mutations[:10])
-                     + ("…" if len(vh_mutations) > 10 else ""))
+        lines.append("  VH changes: " + ", ".join(
+            f"{m['from']}{m['position']}{m['to']}" for m in vh_mutations[:10]
+        ) + ("…" if len(vh_mutations) > 10 else ""))
     lines += [
         "",
         f"[OASis Identity  (threshold={int(t*100)}%)]",
@@ -386,18 +393,17 @@ def _build_summary(vh_mutations, vl_mutations, before, after, germlines, t, plot
         lines.append(f"  VL Before: {fmt(before['oasis_identity_vl'])}%  →  After: {fmt(after['oasis_identity_vl'])}%")
     lines += [
         "",
-        f"[OASis Percentile]",
+        "[OASis Percentile]",
         f"  VH Before: {fmt(before['oasis_percentile'])}  →  After: {fmt(after['oasis_percentile'])}",
         "",
-        f"[Germline Content]",
+        "[Germline Content]",
         f"  VH Before: {fmt(before['germline_content'])}%  →  After: {fmt(after['germline_content'])}%",
         "",
-        f"[Germlines]",
+        "[Germlines]",
         f"  VH Before: {germlines['vh_before']}",
         f"  VH After : {germlines['vh_after']}",
     ]
     if germlines["vl_before"] != "N/A":
-        lines.append(f"  VL Before: {germlines['vl_before']}")
-        lines.append(f"  VL After : {germlines['vl_after']}")
-    lines += ["", f"[Output]", f"  Plot  : {plot_path}", "=" * 48]
-    return "\n".join(l for l in lines if l is not None)
+        lines += [f"  VL Before: {germlines['vl_before']}", f"  VL After : {germlines['vl_after']}"]
+    lines += ["", "[Output]", f"  Plot  : {plot_path}", "=" * 48]
+    return "\n".join(lines)
