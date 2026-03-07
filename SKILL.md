@@ -76,7 +76,7 @@ print(result["summary"])
   Combined Before: 37.14%  →  After: 71.43%
 
 [OASis Percentile]
-  VH Before: 0.02  →  After: 0.34
+  VH Before: 2.00%  →  After: 34.00%
 
 [Germline Content]
   VH Before: 67.26%  →  After: 77.88%

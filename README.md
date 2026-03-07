@@ -83,7 +83,7 @@ Runs **Sapiens humanization** then evaluates humanness **before and after** via 
 | `oasis_identity` | Combined VH+VL OASis identity (%) |
 | `oasis_identity_vh` | VH-only OASis identity (%) |
 | `oasis_identity_vl` | VL-only OASis identity (%) |
-| `oasis_percentile` | VH percentile rank vs human antibody database (0–1) |
+| `oasis_percentile` | VH percentile rank vs human antibody database (%) |
 | `germline_content` | % of residues matching closest human germline (VH) |
 
 ---
@@ -116,7 +116,7 @@ The **fraction of 9-mer peptides** in the antibody V-region that appear in ≥10
 - **> 80%** — Highly human (clinical candidates typical range)
 
 ### OASis Percentile
-Rank of the antibody's OASis identity compared to a reference set of clinical-stage human antibodies. A value of **0.5** means the antibody is more human than 50% of clinical antibodies.
+Rank of the antibody's OASis identity compared to a reference set of clinical-stage human antibodies, reported in **percent**. A value of **50** means the antibody is more human than 50% of clinical antibodies.
 
 ### Germline Content
 Percentage of residues in the V-region that match the closest human germline gene. After Sapiens humanization this typically increases.

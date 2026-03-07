@@ -211,7 +211,7 @@ def evaluate_humanness(
     summary_lines = [
         "=== OASis Humanness Evaluation ===",
         f"OASis Identity ({int(t*100)}%): {metrics['oasis_identity']:.1f}%",
-        f"OASis Percentile: {metrics['oasis_percentile']:.2f}",
+        f"OASis Percentile: {metrics['oasis_percentile']:.2f}%",
         f"Germline Content: {metrics['germline_content']:.1f}%",
     ]
     if humanness_vh:
@@ -251,7 +251,7 @@ def _metrics(vh_h, vl_h, t):
     def oasis_id(h):
         return h.get_oasis_identity(t) * 100 if h else None
     def oasis_pct(h):
-        return h.get_oasis_percentile(t) if h else None
+        return h.get_oasis_percentile(t) * 100 if h else None
     def gc(h):
         return h.num_germline_residues / len(h.chain) * 100 if h else None
 
@@ -334,8 +334,8 @@ def _save_excel(vh_hzn, vl_hzn, before_vh, after_vh, before_vl, after_vl, output
                 "Chain": chain_label,
                 "OASis Identity Before (%)": round(before_h.get_oasis_identity(t) * 100, 2),
                 "OASis Identity After (%)": round(after_h.get_oasis_identity(t) * 100, 2) if after_h else "N/A",
-                "OASis Percentile Before": round(before_h.get_oasis_percentile(t), 3),
-                "OASis Percentile After": round(after_h.get_oasis_percentile(t), 3) if after_h else "N/A",
+                "OASis Percentile Before (%)": round(before_h.get_oasis_percentile(t) * 100, 2),
+                "OASis Percentile After (%)": round(after_h.get_oasis_percentile(t) * 100, 2) if after_h else "N/A",
                 "Germline Content Before (%)": round(before_h.num_germline_residues / len(before_h.chain) * 100, 2),
                 "Germline Content After (%)": round(after_h.num_germline_residues / len(after_h.chain) * 100, 2) if after_h else "N/A",
                 "V Germline Before": before_h.v_germline_names[0] if before_h.v_germline_names else "",
@@ -395,7 +395,7 @@ def _build_summary(vh_mutations, vl_mutations, before, after, germlines, t, plot
     lines += [
         "",
         "[OASis Percentile]",
-        f"  VH Before: {fmt(before['oasis_percentile'])}  →  After: {fmt(after['oasis_percentile'])}",
+        f"  VH Before: {fmt(before['oasis_percentile'])}%  →  After: {fmt(after['oasis_percentile'])}%",
         "",
         "[Germline Content]",
         f"  VH Before: {fmt(before['germline_content'])}%  →  After: {fmt(after['germline_content'])}%",
